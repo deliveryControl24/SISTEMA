@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ingresos y Egresos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .edit-button, .delete-button {
+            margin-right: 5px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .summary {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .inventory {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sistema de Ingresos y Egresos</h1>
+        <form id="transactionForm">
+            <label for="type">Tipo:</label>
+            <select id="type" name="type">
+                <option value="ingreso">Ingreso</option>
+                <option value="egreso">Egreso</option>
+            </select>
+            <br><br>
+            <label for="category">Categoría:</label>
+            <select id="category" name="category">
+                <option value="herramientas">Herramientas</option>
+                <option value="materiales_construccion">Materiales de Construcción</option>
+                <option value="electricidad">Electricidad</option>
+                <option value="plomeria">Plomería</option>
+                <option value="pintura">Pintura</option>
+                <option value="otros">Otros</option>
+            </select>
+            <br><br>
+            <label for="product">Producto:</label>
+            <input type="text" id="product" name="product" required>
+            <br><br>
+            <label for="quantity">Cantidad:</label>
+            <input type="number" id="quantity" name="quantity" required min="1">
+            <br><br>
+            <label for="amount">Monto:</label>
+            <input type="number" id="amount" name="amount" required min="0.01" step="0.01">
+            <br><br>
+            <label for="currency">Moneda:</label>
+            <select id="currency" name="currency">
+                <option value="C$">Córdoba (C$)</option>
+                <option value="USD">Dólar (USD)</option>
+            </select>
+            <br><br>
+            <label for="date">Fecha:</label>
+            <input type="date" id="date" name="date" required>
+            <br><br>
+            <button type="submit">Agregar</button>
+        </form>
+        <div class="error" id="errorMessage"></div>
+        <table id="transactionTable">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Categoría</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Monto</th>
+                    <th>Moneda</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Transacciones se mostrarán aquí -->
+            </tbody>
+        </table>
+        <div class="summary">
+            <p>Total Ingresos (C$): <span id="totalIngresosCordobas">0</span></p>
+            <p>Total Egresos (C$): <span id="totalEgresosCordobas">0</span></p>
+            <p>Balance Neto (C$): <span id="balanceNetoCordobas">0</span></p>
+            <p>Total Ingresos (USD): <span id="totalIngresosDolares">0</span></p>
+            <p>Total Egresos (USD): <span id="totalEgresosDolares">0</span></p>
+            <p>Balance Neto (USD): <span id="balanceNetoDolares">0</span></p>
+        </div>
+
+        <!-- Gestión de Inventario -->
+        <div class="inventory">
+            <h2>Gestión de Inventario</h2>
+            <form id="inventoryForm">
+                <label for="inventoryProduct">Producto:</label>
+                <input type="text" id="inventoryProduct" name="inventoryProduct" required>
+                <br><br>
+                <label for="inventoryQuantity">Cantidad:</label>
+                <input type="number" id="inventoryQuantity" name="inventoryQuantity" required min="0">
+                <br><br>
+                <label for="inventorySupplier">Proveedor:</label>
+                <input type="text" id="inventorySupplier" name="inventorySupplier" required>
+                <br><br>
+                <button type="submit">Agregar al Inventario</button>
+            </form>
+            <div class="error" id="inventoryErrorMessage"></div>
+            <table id="inventoryTable">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Proveedor</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Inventario se mostrará aquí -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const transactionForm = document.getElementById('transactionForm');
+            const transactionTable = document.getElementById('transactionTable').querySelector('tbody');
+            const errorMessage = document.getElementById('errorMessage');
+            let editingIndex = -1;
+
+            const inventoryForm = document.getElementById('inventoryForm');
+            const inventoryTable = document.getElementById('inventoryTable').querySelector('tbody');
+            const inventoryErrorMessage = document.getElementById('inventoryErrorMessage');
+            let editingInventoryIndex = -1;
+
+            transactionForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                errorMessage.textContent = '';
+                if (editingIndex === -1) {
+                    addTransaction();
+                } else {
+                    updateTransaction();
+                }
+            });
+
+            inventoryForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                inventoryErrorMessage.textContent = '';
+                if (editingInventoryIndex === -1) {
+                    addInventoryItem();
+                } else {
+                    updateInventoryItem();
+                }
+            });
+
+            function addTransaction() {
+                const type = document.getElementById('type').value;
+                const category = document.getElementById('category').value;
+                const product = document.getElementById('product').value;
+                const quantity = parseFloat(document.getElementById('quantity').value);
+                const amount = parseFloat(document.getElementById('amount').value);
+                const currency = document.getElementById('currency').value;
+                const date = document.getElementById('date').value;
+
+                if (isNaN(quantity) || isNaN(amount) || quantity <= 0 || amount <= 0) {
+                    errorMessage.textContent = 'Por favor, ingrese valores válidos para cantidad y monto.';
+                    return;
+                }
+
+                const transaction = { type, category, product, quantity, amount, currency, date };
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                transactions.push(transaction);
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+
+                displayTransactions();
+                updateSummary();
+                transactionForm.reset();
+            }
+
+            function updateTransaction() {
+                const type = document.getElementById('type').value;
+                const category = document.getElementById('category').value;
+                const product = document.getElementById('product').value;
+                const quantity = parseFloat(document.getElementById('quantity').value);
+                const amount = parseFloat(document.getElementById('amount').value);
+                const currency = document.getElementById('currency').value;
+                const date = document.getElementById('date').value;
+
+                if (isNaN(quantity) || isNaN(amount) || quantity <= 0 || amount <= 0) {
+                    errorMessage.textContent = 'Por favor, ingrese valores válidos para cantidad y monto.';
+                    return;
+                }
+
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                transactions[editingIndex] = { type, category, product, quantity, amount, currency, date };
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+
+                editingIndex = -1;
+                displayTransactions();
+                updateSummary();
+                transactionForm.reset();
+            }
+
+            function displayTransactions() {
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                transactionTable.innerHTML = '';
+                transactions.forEach((transaction, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${transaction.type}</td>
+                        <td>${transaction.category}</td>
+                        <td>${transaction.product}</td>
+                        <td>${transaction.quantity}</td>
+                        <td>${transaction.amount}</td>
+                        <td>${transaction.currency}</td>
+                        <td>${transaction.date}</td>
+                        <td>
+                            <button class="edit-button" onclick="editTransaction(${index})">Editar</button>
+                            <button class="delete-button" onclick="confirmDelete(${index})">Eliminar</button>
+                        </td>
+                    `;
+                    transactionTable.appendChild(row);
+                });
+            }
+
+            window.editTransaction = function (index) {
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                const transaction = transactions[index];
+                document.getElementById('type').value = transaction.type;
+                document.getElementById('category').value = transaction.category;
+                document.getElementById('product').value = transaction.product;
+                document.getElementById('quantity').value = transaction.quantity;
+                document.getElementById('amount').value = transaction.amount;
+                document.getElementById('currency').value = transaction.currency;
+                document.getElementById('date').value = transaction.date;
+                editingIndex = index;
+            };
+
+            window.confirmDelete = function (index) {
+                if (confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
+                    deleteTransaction(index);
+                }
+            };
+
+            window.deleteTransaction = function (index) {
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                transactions.splice(index, 1);
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                displayTransactions();
+                updateSummary();
+            };
+
+            function updateSummary() {
+                const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                const totalIngresosCordobas = transactions.reduce((sum, transaction) => transaction.type === 'ingreso' && transaction.currency === 'C$' ? sum + transaction.amount : sum, 0);
+                const totalEgresosCordobas = transactions.reduce((sum, transaction) => transaction.type === 'egreso' && transaction.currency === 'C$' ? sum + transaction.amount : sum, 0);
+                const balanceNetoCordobas = totalIngresosCordobas - totalEgresosCordobas;
+
+                const totalIngresosDolares = transactions.reduce((sum, transaction) => transaction.type === 'ingreso' && transaction.currency === 'USD' ? sum + transaction.amount : sum, 0);
+                const totalEgresosDolares = transactions.reduce((sum, transaction) => transaction.type === 'egreso' && transaction.currency === 'USD' ? sum + transaction.amount : sum, 0);
+                const balanceNetoDolares = totalIngresosDolares - totalEgresosDolares;
+
+                document.getElementById('totalIngresosCordobas').textContent = totalIngresosCordobas.toFixed(2);
+                document.getElementById('totalEgresosCordobas').textContent = totalEgresosCordobas.toFixed(2);
+                document.getElementById('balanceNetoCordobas').textContent = balanceNetoCordobas.toFixed(2);
+
+                document.getElementById('totalIngresosDolares').textContent = totalIngresosDolares.toFixed(2);
+                document.getElementById('totalEgresosDolares').textContent = totalEgresosDolares.toFixed(2);
+                document.getElementById('balanceNetoDolares').textContent = balanceNetoDolares.toFixed(2);
+            }
+
+            function addInventoryItem() {
+                const product = document.getElementById('inventoryProduct').value;
+                const quantity = parseFloat(document.getElementById('inventoryQuantity').value);
+                const supplier = document.getElementById('inventorySupplier').value;
+
+                if (isNaN(quantity) || quantity < 0) {
+                    inventoryErrorMessage.textContent = 'Por favor, ingrese una cantidad válida.';
+                    return;
+                }
+
+                const inventoryItem = { product, quantity, supplier };
+                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+                inventory.push(inventoryItem);
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+
+                displayInventory();
+                inventoryForm.reset();
+            }
+
+            function updateInventoryItem() {
+                const product = document.getElementById('inventoryProduct').value;
+                const quantity = parseFloat(document.getElementById('inventoryQuantity').value);
+                const supplier = document.getElementById('inventorySupplier').value;
+
+                if (isNaN(quantity) || quantity < 0) {
+                    inventoryErrorMessage.textContent = 'Por favor, ingrese una cantidad válida.';
+                    return;
+                }
+
+                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+                inventory[editingInventoryIndex] = { product, quantity, supplier };
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+
+                editingInventoryIndex = -1;
+                displayInventory();
+                inventoryForm.reset();
+            }
+
+            function displayInventory() {
+                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+                inventoryTable.innerHTML = '';
+                inventory.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.product}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.supplier}</td>
+                        <td>
+                            <button class="edit-button" onclick="editInventoryItem(${index})">Editar</button>
+                            <button class="delete-button" onclick="confirmDeleteInventoryItem(${index})">Eliminar</button>
+                        </td>
+                    `;
+                    inventoryTable.appendChild(row);
+                });
+            }
+
+            window.editInventoryItem = function (index) {
+                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+                const item = inventory[index];
+                document.getElementById('inventoryProduct').value = item.product;
+                document.getElementById('inventoryQuantity').value = item.quantity;
+                document.getElementById('inventorySupplier').value = item.supplier;
+                editingInventoryIndex = index;
+            };
+
+            window.confirmDeleteInventoryItem = function (index) {
+                if (confirm('¿Estás seguro de que deseas eliminar este artículo del inventario?')) {
+                    deleteInventoryItem(index);
+                }
+            };
+
+            window.deleteInventoryItem = function (index) {
+                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+                inventory.splice(index, 1);
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                displayInventory();
+            };
+
+            displayTransactions();
+            updateSummary();
+            displayInventory();
+        });
+    </script>
+</body>
+</html>

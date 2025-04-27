@@ -8,10 +8,16 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
         }
         .container {
-            max-width: 600px;
+            max-width: 1200px;
             margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         table {
             width: 100%;
@@ -19,24 +25,52 @@
             margin-top: 20px;
         }
         table, th, td {
-            border: 1px solid black;
+            border: 1px solid #ddd;
         }
         th, td {
-            padding: 10px;
+            padding: 12px;
             text-align: left;
         }
-        .edit-button, .delete-button {
+        th {
+            background-color: #f2f2f2;
+        }
+        .edit-button, .delete-button, .export-button {
             margin-right: 5px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .edit-button {
+            background-color: #007BFF;
+            color: white;
+        }
+        .delete-button {
+            background-color: #DC3545;
+            color: white;
+        }
+        .export-button {
+            background-color: #28a745;
+            color: white;
         }
         .error {
             color: red;
             margin-top: 10px;
         }
-        .summary {
+        .summary, .reports, .notifications, .history {
             margin-top: 20px;
             font-weight: bold;
         }
         .inventory {
+            margin-top: 20px;
+        }
+        h1, h2 {
+            color: #007BFF;
+        }
+        .search-bar {
+            margin-bottom: 20px;
+        }
+        .theme-toggle {
             margin-top: 20px;
         }
     </style>
@@ -44,6 +78,19 @@
 <body>
     <div class="container">
         <h1>Sistema de Ingresos y Egresos</h1>
+
+        <!-- Tema Oscuro/Claro -->
+        <div class="theme-toggle">
+            <label for="themeToggle">Tema Oscuro:</label>
+            <input type="checkbox" id="themeToggle">
+        </div>
+
+        <!-- Búsqueda y Filtros -->
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Buscar...">
+            <button onclick="filterTransactions()">Buscar</button>
+        </div>
+
         <form id="transactionForm">
             <label for="type">Tipo:</label>
             <select id="type" name="type">
@@ -63,6 +110,9 @@
             <br><br>
             <label for="product">Producto:</label>
             <input type="text" id="product" name="product" required>
+            <br><br>
+            <label for="description">Descripción:</label>
+            <textarea id="description" name="description"></textarea>
             <br><br>
             <label for="quantity">Cantidad:</label>
             <input type="number" id="quantity" name="quantity" required min="1">
@@ -88,6 +138,7 @@
                     <th>Tipo</th>
                     <th>Categoría</th>
                     <th>Producto</th>
+                    <th>Descripción</th>
                     <th>Cantidad</th>
                     <th>Monto</th>
                     <th>Moneda</th>
@@ -115,11 +166,20 @@
                 <label for="inventoryProduct">Producto:</label>
                 <input type="text" id="inventoryProduct" name="inventoryProduct" required>
                 <br><br>
+                <label for="inventoryDescription">Descripción:</label>
+                <textarea id="inventoryDescription" name="inventoryDescription"></textarea>
+                <br><br>
                 <label for="inventoryQuantity">Cantidad:</label>
                 <input type="number" id="inventoryQuantity" name="inventoryQuantity" required min="0">
                 <br><br>
                 <label for="inventorySupplier">Proveedor:</label>
                 <input type="text" id="inventorySupplier" name="inventorySupplier" required>
+                <br><br>
+                <label for="entryDate">Fecha de Entrada:</label>
+                <input type="date" id="entryDate" name="entryDate" required>
+                <br><br>
+                <label for="exitDate">Fecha de Salida:</label>
+                <input type="date" id="exitDate" name="exitDate">
                 <br><br>
                 <button type="submit">Agregar al Inventario</button>
             </form>
@@ -128,8 +188,12 @@
                 <thead>
                     <tr>
                         <th>Producto</th>
+                        <th>Descripción</th>
                         <th>Cantidad</th>
                         <th>Proveedor</th>
+                        <th>Fecha de Entrada</th>
+                        <th>Fecha de Salida</th>
+                        <th>Días en Inventario</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -138,8 +202,43 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Reportes y Análisis -->
+        <div class="reports">
+            <h2>Reportes y Análisis</h2>
+            <button class="export-button" onclick="exportToExcel()">Exportar a Excel</button>
+            <button class="export-button" onclick="exportToPDF()">Exportar a PDF</button>
+            <canvas id="chartCanvas"></canvas>
+        </div>
+
+        <!-- Notificaciones y Alertas -->
+        <div class="notifications">
+            <h2>Notificaciones y Alertas</h2>
+            <div id="notificationMessage"></div>
+        </div>
+
+        <!-- Historial de Cambios -->
+        <div class="history">
+            <h2>Historial de Cambios</h2>
+            <table id="historyTable">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Acción</th>
+                        <th>Detalles</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Historial se mostrará aquí -->
+                </tbody>
+            </table>
+        </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.68/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.68/vfs_fonts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const transactionForm = document.getElementById('transactionForm');
@@ -151,6 +250,14 @@
             const inventoryTable = document.getElementById('inventoryTable').querySelector('tbody');
             const inventoryErrorMessage = document.getElementById('inventoryErrorMessage');
             let editingInventoryIndex = -1;
+
+            const notificationMessage = document.getElementById('notificationMessage');
+            const historyTable = document.getElementById('historyTable').querySelector('tbody');
+
+            const themeToggle = document.getElementById('themeToggle');
+            themeToggle.addEventListener('change', function () {
+                document.body.classList.toggle('dark-mode', themeToggle.checked);
+            });
 
             transactionForm.addEventListener('submit', function (event) {
                 event.preventDefault();
@@ -176,6 +283,7 @@
                 const type = document.getElementById('type').value;
                 const category = document.getElementById('category').value;
                 const product = document.getElementById('product').value;
+                const description = document.getElementById('description').value;
                 const quantity = parseFloat(document.getElementById('quantity').value);
                 const amount = parseFloat(document.getElementById('amount').value);
                 const currency = document.getElementById('currency').value;
@@ -186,11 +294,12 @@
                     return;
                 }
 
-                const transaction = { type, category, product, quantity, amount, currency, date };
+                const transaction = { type, category, product, description, quantity, amount, currency, date };
                 const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
                 transactions.push(transaction);
                 localStorage.setItem('transactions', JSON.stringify(transactions));
 
+                addHistory('Transacción agregada', transaction);
                 displayTransactions();
                 updateSummary();
                 transactionForm.reset();
@@ -200,6 +309,7 @@
                 const type = document.getElementById('type').value;
                 const category = document.getElementById('category').value;
                 const product = document.getElementById('product').value;
+                const description = document.getElementById('description').value;
                 const quantity = parseFloat(document.getElementById('quantity').value);
                 const amount = parseFloat(document.getElementById('amount').value);
                 const currency = document.getElementById('currency').value;
@@ -211,8 +321,11 @@
                 }
 
                 const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-                transactions[editingIndex] = { type, category, product, quantity, amount, currency, date };
+                const oldTransaction = transactions[editingIndex];
+                transactions[editingIndex] = { type, category, product, description, quantity, amount, currency, date };
                 localStorage.setItem('transactions', JSON.stringify(transactions));
+
+                addHistory('Transacción actualizada', { old: oldTransaction, new: transactions[editingIndex] });
 
                 editingIndex = -1;
                 displayTransactions();
@@ -229,6 +342,7 @@
                         <td>${transaction.type}</td>
                         <td>${transaction.category}</td>
                         <td>${transaction.product}</td>
+                        <td>${transaction.description}</td>
                         <td>${transaction.quantity}</td>
                         <td>${transaction.amount}</td>
                         <td>${transaction.currency}</td>
@@ -248,6 +362,7 @@
                 document.getElementById('type').value = transaction.type;
                 document.getElementById('category').value = transaction.category;
                 document.getElementById('product').value = transaction.product;
+                document.getElementById('description').value = transaction.description;
                 document.getElementById('quantity').value = transaction.quantity;
                 document.getElementById('amount').value = transaction.amount;
                 document.getElementById('currency').value = transaction.currency;
@@ -263,8 +378,11 @@
 
             window.deleteTransaction = function (index) {
                 const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                const deletedTransaction = transactions[index];
                 transactions.splice(index, 1);
                 localStorage.setItem('transactions', JSON.stringify(transactions));
+
+                addHistory('Transacción eliminada', deletedTransaction);
                 displayTransactions();
                 updateSummary();
             };
@@ -290,86 +408,31 @@
 
             function addInventoryItem() {
                 const product = document.getElementById('inventoryProduct').value;
+                const description = document.getElementById('inventoryDescription').value;
                 const quantity = parseFloat(document.getElementById('inventoryQuantity').value);
                 const supplier = document.getElementById('inventorySupplier').value;
+                const entryDate = document.getElementById('entryDate').value;
+                const exitDate = document.getElementById('exitDate').value;
 
                 if (isNaN(quantity) || quantity < 0) {
                     inventoryErrorMessage.textContent = 'Por favor, ingrese una cantidad válida.';
                     return;
                 }
 
-                const inventoryItem = { product, quantity, supplier };
+                const inventoryItem = { product, description, quantity, supplier, entryDate, exitDate };
                 const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
                 inventory.push(inventoryItem);
                 localStorage.setItem('inventory', JSON.stringify(inventory));
 
+                addHistory('Artículo de inventario agregado', inventoryItem);
                 displayInventory();
+                checkInventoryAlerts();
                 inventoryForm.reset();
             }
 
             function updateInventoryItem() {
                 const product = document.getElementById('inventoryProduct').value;
+                const description = document.getElementById('inventoryDescription').value;
                 const quantity = parseFloat(document.getElementById('inventoryQuantity').value);
                 const supplier = document.getElementById('inventorySupplier').value;
-
-                if (isNaN(quantity) || quantity < 0) {
-                    inventoryErrorMessage.textContent = 'Por favor, ingrese una cantidad válida.';
-                    return;
-                }
-
-                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-                inventory[editingInventoryIndex] = { product, quantity, supplier };
-                localStorage.setItem('inventory', JSON.stringify(inventory));
-
-                editingInventoryIndex = -1;
-                displayInventory();
-                inventoryForm.reset();
-            }
-
-            function displayInventory() {
-                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-                inventoryTable.innerHTML = '';
-                inventory.forEach((item, index) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${item.product}</td>
-                        <td>${item.quantity}</td>
-                        <td>${item.supplier}</td>
-                        <td>
-                            <button class="edit-button" onclick="editInventoryItem(${index})">Editar</button>
-                            <button class="delete-button" onclick="confirmDeleteInventoryItem(${index})">Eliminar</button>
-                        </td>
-                    `;
-                    inventoryTable.appendChild(row);
-                });
-            }
-
-            window.editInventoryItem = function (index) {
-                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-                const item = inventory[index];
-                document.getElementById('inventoryProduct').value = item.product;
-                document.getElementById('inventoryQuantity').value = item.quantity;
-                document.getElementById('inventorySupplier').value = item.supplier;
-                editingInventoryIndex = index;
-            };
-
-            window.confirmDeleteInventoryItem = function (index) {
-                if (confirm('¿Estás seguro de que deseas eliminar este artículo del inventario?')) {
-                    deleteInventoryItem(index);
-                }
-            };
-
-            window.deleteInventoryItem = function (index) {
-                const inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-                inventory.splice(index, 1);
-                localStorage.setItem('inventory', JSON.stringify(inventory));
-                displayInventory();
-            };
-
-            displayTransactions();
-            updateSummary();
-            displayInventory();
-        });
-    </script>
-</body>
-</html>
+                const entryDate = document.getElementById('entryDate').value;
